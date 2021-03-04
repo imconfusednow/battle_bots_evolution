@@ -13,11 +13,12 @@ class Bot:
         self.hspeed = 0
         self.vspeed = 0
         self.rspeed = 0
-        self.maxspeed = 3.0
+        self.maxspeed = 4
         self.maxrspeed = 0.1
-        self.friction = 0.99
+        self.friction = 0.98
         self.id = id
         self.brain = brain
+        self.brain.start_loc = (x,y,self.dir)
         self.alive = True
         self.thrust = 0.0
         self.turn_left = 0
@@ -33,16 +34,18 @@ class Bot:
             0, self.win_height, self.win_width, self.win_height], [0, 0, 0, self.win_height]]
         self.inputs = [0, 0, 0, 0, 1]
         self.font = pygame.font.SysFont("comicsansms", 12)
-        self.age = 0
+        self.total_rot = 0
+        self.see_something = False
 
-    def go(self, human, draw):
+
+    def go(self, human, draw, display_value=""):
         if human:
             self.get_input()
         else:
             self.think()
         to_return = self.update()
         if draw:
-            self.draw()
+            self.draw(display_value)
         return to_return
 
     def get_input(self):
@@ -91,12 +94,12 @@ class Bot:
             if speed < self.maxspeed:
                 self.hspeed += self.thrust * math.cos(numpy.deg2rad(self.dir))
                 self.vspeed += self.thrust * math.sin(numpy.deg2rad(self.dir))
-            else:
-                self.hspeed = self.maxspeed * math.cos(numpy.deg2rad(self.dir))
-                self.vspeed = self.maxspeed * math.sin(numpy.deg2rad(self.dir))
+            #else:
+            #    self.hspeed = self.maxspeed * math.cos(numpy.deg2rad(self.dir))
+            #    self.vspeed = self.maxspeed * math.sin(numpy.deg2rad(self.dir))
 
         self.rspeed = self.turn_right - self.turn_left
-        if self.rspeed > self.maxrspeed: self.rspeed = self.maxrspeed
+        #if self.rspeed > self.maxrspeed: self.rspeed = self.maxrspeed
 
         self.x += self.hspeed
         self.y += self.vspeed
@@ -110,18 +113,22 @@ class Bot:
         self.turn_right = 0
         self.thrust = 0
 
-        self.age += abs(self.rspeed)
-
-        if self.age > 15000 or self.x < 0 or self.x > self.win_width or self.y < 0 or self.y > self.win_height:
+        if self.x < 0 or self.x > self.win_width or self.y < 0 or self.y > self.win_height:
             self.alive = False
 
-        # self.update_bullets()
+        '''self.update_bullets()
 
         if abs(self.rspeed) > 0.1:
-            speed = 0
-        return max(0, speed)
+            speed /= 2'''
+        #self.total_rot += self.rspeed
 
-    def draw(self):
+        if not self.see_something and abs(self.rspeed) > 0.3:
+            return 0
+
+        return max(0, speed )
+
+    def draw(self, display_value):
+        display_value = display_value if display_value != "" else self.brain.id
         for e in range(len(self.eye_pos)):
             colour = (0, 255, 0)
             i = self.eye_pos[e]
@@ -129,10 +136,10 @@ class Bot:
                 colour = (255, 0, 0)
             pygame.draw.line(self.win, colour, (int(self.x),
                                                 int(self.y)), (i[0], i[1]), 2)
-        colour = self.brain.colour if self.brain != 0 and self.brain.max_node < 11 else (
+        colour = self.brain.colour if self.brain != 0 else (
             0, 0, 255)
         pygame.draw.circle(self.win, colour, (int(self.x), int(self.y)), 20)
-        self.text(str(round(self.brain.fitness)), self.x, self.y)
+        self.text(str(display_value), self.x - 10, self.y - 10)
         for bu in range(len(self.bullets) - 1, -1, -1):
             b = self.bullets[bu]
             b.draw()
@@ -145,10 +152,10 @@ class Bot:
         self.thrust = power * 0.1
 
     def left(self, power):
-        self.turn_left = power * 2
+        self.turn_left = power * 3
 
     def right(self, power):
-        self.turn_right = power * 2
+        self.turn_right = power * 3
 
     def shoot(self):
         if self.last_shot > 200:
@@ -167,6 +174,7 @@ class Bot:
 
     def look(self):
         self.eye_pos = []
+        self.see_something = False
         for i in range(self.eyes):
             this_dir = self.dir + (360 / self.eyes) * i
             end = [self.x + int(math.cos(numpy.deg2rad(this_dir)) * 100),
@@ -174,7 +182,8 @@ class Bot:
             self.eye_pos.append(end)
 
         if self.x > 100 and self.x < self.win_width - 100 and self.y > 100 and self.y < self.win_height - 100:
-            return
+            self.inputs = [0 for i in self.inputs]
+            self.inputs[-1] = 1
 
         for j in range(len(self.eye_pos)):
             for i in range(len(self.boundaries)):
@@ -212,6 +221,7 @@ class Bot:
             if (dist > 100):
                 return 100
             else:
+                self.see_something = True
                 return dist
         else:
             return 100
